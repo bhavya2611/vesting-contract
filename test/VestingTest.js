@@ -5,7 +5,7 @@ const { solidity } = require("ethereum-waffle");
 
 use(solidity);
 
-describe("NFT Category Contract", function () {
+describe("Vesting Contract", function () {
   it("Defining Generals", async function () {
     // General
     provider = ethers.provider;
