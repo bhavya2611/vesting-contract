@@ -12,9 +12,11 @@ contract Vesting is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
 
     address public stableCoin;
+    address public vestToken;
 
-    constructor(address _stableCoin) {
+    constructor(address _stableCoin, address _vestToken) {
         stableCoin = _stableCoin;
+        vestToken = _vestToken;
     }
 
     struct PreSaleTierInfo {
@@ -25,10 +27,21 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 price;
     }
 
+    // tierId => startTime
     mapping(uint256 => uint256) public startVestingForTier;
+
+    // tierId => month => percentage
     mapping(uint256 => mapping(uint256 => uint256)) public allocationPerMonth;
+
+    // user address => tierId => tokensBought
     mapping(address => mapping(uint256 => uint256)) public tokensBought;
+
+    // tierId => tokensBought
     mapping(uint256 => uint256) public totalTokensBoughtForTier;
+
+    // user address => tierId => month => vested
+    mapping(address => mapping(uint256 => mapping(uint256 => bool)))
+        public userVestedTokens;
 
     TierInfo[] public tierInfo;
 
@@ -108,14 +121,38 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Cant buy more tokens for this tier"
         );
         require(
-            tokensBought[msg.sender] + _numTokens <
+            tokensBought[msg.sender][_tierId] + _numTokens <
                 tierInfo[_tierId].maxTokensPerWallet,
             "You cant buy more tokens"
         );
         uint256 tokenPrice = tierInfo[_tierId].price.mul(_numTokens);
         IERC20(stableCoin).transferFrom(msg.sender, address(this), _amount);
-        tokensBought[msg.sender] = tokensBought[msg.sender].add(_numTokens);
+        tokensBought[msg.sender][_tierId] = tokensBought[msg.sender][_tierId]
+            .add(_numTokens);
         totalTokensBoughtForTier[_tierId] = totalTokensBoughtForTier[_tierId]
             .add(_numTokens);
+    }
+
+    function vestTokens(uint256 _tierId, uint256 _month) public payable {
+        require(
+            startVestingForTier[_tierId] < block.timestamp,
+            "Vesting for tier not yet started"
+        );
+        require(
+            tokensBought[msg.sender][_tierId] > 0,
+            "Your token balance is zero"
+        );
+        require(
+            !userVestedTokens[msg.sender][_tierId][_month],
+            "You already vested tokens"
+        );
+
+        // add a require to calculate month and _month less than the months passed
+
+        uint256 amount = tokensBought[msg.sender][_tierId]
+            .mul(allocationPerMonth[_tierId][_month])
+            .div(10000);
+        userVestedTokens[msg.sender][_tierId][_month] = true;
+        IERC20(vestToken).transferFrom(address(this), msg.sender, amount);
     }
 }
