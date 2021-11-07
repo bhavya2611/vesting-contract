@@ -83,4 +83,57 @@ describe('Vesting Contract', function () {
     const tierInfo = await vestingContract.tierInfo(1);
     expect(tierInfo.price).to.equal(ethers.utils.parseEther('8'));
   });
+
+  it('Set allocations for tier 1', async function () {
+    await vestingContract.setAllocation(0, 2, 10);
+    await vestingContract.setAllocation(0, 4, 20);
+    await vestingContract.setAllocation(0, 6, 30);
+    await vestingContract.setAllocation(0, 8, 40);
+
+    let allocationPerMonthInfo = await vestingContract.allocationPerMonth(0, 2);
+    expect(allocationPerMonthInfo).to.equal(10);
+    allocationPerMonthInfo = await vestingContract.allocationPerMonth(0, 4);
+    expect(allocationPerMonthInfo).to.equal(20);
+    allocationPerMonthInfo = await vestingContract.allocationPerMonth(0, 6);
+    expect(allocationPerMonthInfo).to.equal(30);
+    allocationPerMonthInfo = await vestingContract.allocationPerMonth(0, 8);
+    expect(allocationPerMonthInfo).to.equal(40);
+    allocationPerMonthInfo = await vestingContract.allocationPerMonth(0, 1);
+    expect(allocationPerMonthInfo).to.equal(0);
+  });
+
+  it('Set Vesting Time For Tier 1', async function () {
+    const time = Date.now() + secondsInMonth;
+    await vestingContract.setVestingTimeForTier(0, time);
+
+    tierVestingInfo = await vestingContract.tierVestingInfo(0);
+    expect(tierVestingInfo.vestingStartTime).to.equal(time);
+  });
+
+  it('Set Vesting Time For Tier 2 Should Fail', async function () {
+    const time = Date.now() + secondsInMonth;
+    await expect(
+      vestingContract.setVestingTimeForTier(1, time)
+    ).to.be.revertedWith('Total allocation less than 100');
+  });
+
+  it('Transfer Stable Tokens to Account 2', async function () {
+    await stableToken.transfer(
+      accounts[2].address,
+      ethers.utils.parseEther('100')
+    );
+
+    balance = await stableToken.balanceOf(accounts[2].address);
+    expect(balance).to.equal(ethers.utils.parseEther('100'));
+  });
+
+  it('Buy Vesting Tokens', async function () {
+    await vestingContract.connect(accounts[2]).buyVestingTokens(0, 10);
+
+    tokensBought = await vestingContract.tokensBought(accounts[2].address, 0);
+    expect(tokensBought).to.equal(10);
+
+    balance = await stableToken.balanceOf(accounts[2].address);
+    expect(balance).to.equal(ethers.utils.parseEther('50'));
+  });
 });

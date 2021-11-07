@@ -43,7 +43,7 @@ contract Vesting is Ownable, ReentrancyGuard {
 
     struct TierVestingInfo {
         uint256 totalTokensBoughtForTier;
-        uint256 startVestingForTier;
+        uint256 vestingStartTime;
         uint256 totalAllocationDone;
     }
 
@@ -103,22 +103,6 @@ contract Vesting is Ownable, ReentrancyGuard {
         return tierInfo.length;
     }
 
-    function setVestingForTier(uint256 _tierId, uint256 _startTime)
-        public
-        onlyOwner
-    {
-        require(_tierId < tierInfo.length, "Invalid tier id");
-        require(
-            tierInfo[_tierId].startTime < _startTime,
-            "Tier not yet started"
-        );
-        require(
-            tierVestingInfo[_tierId].totalAllocationDone == 100,
-            "Total allocation less than 100"
-        );
-        tierVestingInfo[_tierId].startVestingForTier = _startTime;
-    }
-
     function setAllocation(
         uint256 _tierId,
         uint256 _month,
@@ -133,7 +117,7 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Allocation cant be more than 100"
         );
         require(
-            tierVestingInfo[_tierId].startVestingForTier < block.timestamp,
+            tierVestingInfo[_tierId].vestingStartTime < block.timestamp,
             "Vesting started"
         );
         tierVestingInfo[_tierId].totalAllocationDone = tierVestingInfo[_tierId]
@@ -142,7 +126,23 @@ contract Vesting is Ownable, ReentrancyGuard {
         allocationPerMonth[_tierId][_month] = _allocation;
     }
 
-    function buyTokens(uint256 _tierId, uint256 _numTokens) public {
+    function setVestingTimeForTier(uint256 _tierId, uint256 _startTime)
+        public
+        onlyOwner
+    {
+        require(_tierId < tierInfo.length, "Invalid tier id");
+        require(
+            tierInfo[_tierId].startTime < _startTime,
+            "Tier not yet started"
+        );
+        require(
+            tierVestingInfo[_tierId].totalAllocationDone == 100,
+            "Total allocation less than 100"
+        );
+        tierVestingInfo[_tierId].vestingStartTime = _startTime;
+    }
+
+    function buyVestingTokens(uint256 _tierId, uint256 _numTokens) public {
         require(
             tierInfo[_tierId].startTime < block.timestamp,
             "Pre sale not yet started"
@@ -175,7 +175,7 @@ contract Vesting is Ownable, ReentrancyGuard {
 
     function vestTokens(uint256 _tierId) public {
         require(
-            tierVestingInfo[_tierId].startVestingForTier < block.timestamp,
+            tierVestingInfo[_tierId].vestingStartTime < block.timestamp,
             "Vesting for tier not yet started"
         );
         require(
@@ -188,7 +188,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         );
 
         uint256 monthsPassed = (block.timestamp +
-            tierVestingInfo[_tierId].startVestingForTier) % secondsInMonth;
+            tierVestingInfo[_tierId].vestingStartTime) % secondsInMonth;
 
         require(
             monthsPassed > userVestedTokensMonth[msg.sender][_tierId],
