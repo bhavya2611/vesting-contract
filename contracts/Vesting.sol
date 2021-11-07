@@ -117,6 +117,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         onlyOwner
     {
         require(_tierId <= tierInfo.length, "Invalid tier id");
+        require(tierInfo[_tierId].isPrivate, "Tier needs to be private");
         isAddressWhitelisted[_address][_tierId] = true;
     }
 
