@@ -27,23 +27,26 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 price;
     }
 
-    // tierId => startTime
-    mapping(uint256 => uint256) public startVestingForTier;
+    struct TierVestingInfo {
+        uint256 totalTokensBoughtForTier;
+        uint256 startVestingForTier;
+        uint256 totalAllocationDone;
+    }
 
     // tierId => month => percentage
     mapping(uint256 => mapping(uint256 => uint256)) public allocationPerMonth;
 
+    // tierId => TierVestingInfo
+    mapping(uint256 => TierVestingInfo) public tierVestingInfo;
+
     // user address => tierId => tokensBought
     mapping(address => mapping(uint256 => uint256)) public tokensBought;
-
-    // tierId => tokensBought
-    mapping(uint256 => uint256) public totalTokensBoughtForTier;
 
     // user address => tierId => month => vested
     mapping(address => mapping(uint256 => mapping(uint256 => bool)))
         public userVestedTokens;
 
-    TierInfo[] public tierInfo;
+    PreSaleTierInfo[] public tierInfo;
 
     function createPreSaleTier(
         uint256 _maxTokensPerWallet,
@@ -53,7 +56,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _price
     ) external onlyOwner {
         tierInfo.push(
-            TierInfo({
+            PreSaleTierInfo({
                 maxTokensPerWallet: _maxTokensPerWallet,
                 startTime: _startTime,
                 endTime: _endTime,
@@ -95,7 +98,11 @@ contract Vesting is Ownable, ReentrancyGuard {
             tierInfo[_tierId].startTime < _startTime,
             "Tier not yet started"
         );
-        startVestingForTier[_tierId] = _startTime;
+        require(
+            tierVestingInfo[_tierId].totalAllocationDone == 100,
+            "Total allocation less than 100"
+        );
+        tierVestingInfo[_tierId].startVestingForTier = _startTime;
     }
 
     function setAllocation(
@@ -106,6 +113,15 @@ contract Vesting is Ownable, ReentrancyGuard {
         require(_month > 0, "Invalid month number");
         require(_month < 13, "Invalid month number");
         require(_tierId < tierInfo.length, "Invalid tier id");
+        require(
+            tierVestingInfo[_tierId].totalAllocationDone.add(_allocation) <=
+                100,
+            "Allocation cant be more than 100"
+        );
+        // See If a check is required to not allow to do allocation again or change allocation after month is passed
+        tierVestingInfo[_tierId].totalAllocationDone = tierVestingInfo[_tierId]
+            .totalAllocationDone
+            .add(_allocation);
         allocationPerMonth[_tierId][_month] = _allocation;
     }
 
@@ -116,7 +132,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         );
         require(tierInfo[_tierId].endTime > block.timestamp, "Pre sale over");
         require(
-            totalTokensBoughtForTier[_tierId] + _numTokens <
+            tierVestingInfo[_tierId].totalTokensBoughtForTier + _numTokens <
                 tierInfo[_tierId].maxTokensForTier,
             "Cant buy more tokens for this tier"
         );
@@ -126,16 +142,17 @@ contract Vesting is Ownable, ReentrancyGuard {
             "You cant buy more tokens"
         );
         uint256 tokenPrice = tierInfo[_tierId].price.mul(_numTokens);
-        IERC20(stableCoin).transferFrom(msg.sender, address(this), _amount);
+        IERC20(stableCoin).transferFrom(msg.sender, address(this), tokenPrice);
         tokensBought[msg.sender][_tierId] = tokensBought[msg.sender][_tierId]
             .add(_numTokens);
-        totalTokensBoughtForTier[_tierId] = totalTokensBoughtForTier[_tierId]
-            .add(_numTokens);
+        tierVestingInfo[_tierId].totalTokensBoughtForTier = tierVestingInfo[
+            _tierId
+        ].totalTokensBoughtForTier.add(_numTokens);
     }
 
     function vestTokens(uint256 _tierId, uint256 _month) public payable {
         require(
-            startVestingForTier[_tierId] < block.timestamp,
+            tierVestingInfo[_tierId].startVestingForTier < block.timestamp,
             "Vesting for tier not yet started"
         );
         require(
@@ -147,7 +164,7 @@ contract Vesting is Ownable, ReentrancyGuard {
             "You already vested tokens"
         );
 
-        // add a require to calculate month and _month less than the months passed
+        // add a require to calculate month and check _month less than the months passed
 
         uint256 amount = tokensBought[msg.sender][_tierId]
             .mul(allocationPerMonth[_tierId][_month])
