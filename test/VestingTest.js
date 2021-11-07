@@ -1,167 +1,86 @@
-const timeMachine = require("@atixlabs/hardhat-time-n-mine");
-const { ethers } = require("hardhat");
-const { use, expect } = require("chai");
-const { solidity } = require("ethereum-waffle");
+/* eslint-disable */
+
+const timeMachine = require('@atixlabs/hardhat-time-n-mine');
+const { ethers } = require('hardhat');
+const { use, expect } = require('chai');
+const { solidity } = require('ethereum-waffle');
 
 use(solidity);
 
-describe("Vesting Contract", function () {
-  it("Defining Generals", async function () {
+const secondsInMonth = 2592000;
+
+describe('Vesting Contract', function () {
+  it('Defining Generals', async function () {
     // General
     provider = ethers.provider;
     accounts = await hre.ethers.getSigners();
   });
 
-  it("Deploying NFT Contract", async function () {
-    const NFTContract = await ethers.getContractFactory("NftCategory");
-    nftContract = await NFTContract.deploy(
-      "Name",
-      "Symbol",
-      "10",
-      "www.link.com/"
+  it('Deploying Contracts', async function () {
+    const VestToken = await ethers.getContractFactory('ERC20Token');
+    vestToken = await VestToken.deploy(
+      'Vest',
+      'VEST',
+      ethers.utils.parseEther('100000')
     );
-    await nftContract.deployed();
-  });
 
-  it("Create a Private Category - Team minting", async function () {
-    var time = Math.floor(Date.now() / 1000);
-    await nftContract.addCategory(
-      time,
-      time + 5200,
-      5,
-      10,
-      true,
-      true,
-      ethers.utils.parseEther("0.1")
+    const StableToken = await ethers.getContractFactory('ERC20Token');
+    stableToken = await StableToken.deploy(
+      'Stable',
+      'STABLE',
+      ethers.utils.parseEther('100000')
     );
-  });
 
-  it("Allow Address to mint in private Category - Team minting", async function () {
-    await nftContract.allowAddressToMint(accounts[0].address, 0);
-  });
+    await vestToken.deployed();
+    await stableToken.deployed();
 
-  it("Reserve Token for minting", async function () {
-    await nftContract.reserveToken(accounts[0].address, 4);
-    await nftContract.reserveToken(accounts[0].address, 6);
-    var reservedToken4 = await nftContract.reservedTokenOwners(
-      accounts[0].address,
-      0
+    const VestingContract = await ethers.getContractFactory('Vesting');
+    vestingContract = await VestingContract.deploy(
+      stableToken.address,
+      vestToken.address
     );
-    var reservedToken6 = await nftContract.reservedTokenOwners(
-      accounts[0].address,
-      1
+    await vestingContract.deployed();
+  });
+
+  it('Create Tier 1', async function () {
+    await vestingContract.createPreSaleTier(
+      ethers.utils.parseEther('100'),
+      Date.now(),
+      Date.now() + secondsInMonth,
+      ethers.utils.parseEther('200'),
+      ethers.utils.parseEther('5')
     );
-    expect(reservedToken4.toString()).to.equal("4");
-    expect(reservedToken6.toString()).to.equal("6");
-  });
 
-  it("Reserve and Unreserve Tokens", async function () {
-    await nftContract.reserveToken(accounts[2].address, 55);
-    await nftContract.reserveToken(accounts[2].address, 56);
-    await nftContract.unreserveToken(accounts[2].address, 55);
-    var reservedTokens = await nftContract.reservedTokenOwners(
-      accounts[2].address,
-      0
-    );
-    expect(reservedTokens.toString()).to.equal("56");
-  });
-
-  it("Mint Reserved Token", async function () {
-    await nftContract.mintTokens(0, 2, {
-      value: ethers.utils.parseEther("0.2"),
-    });
-    var reservedTokenOwner6 = await nftContract.ownerOf(6);
-    expect(reservedTokenOwner6).to.equal(accounts[0].address);
-    var reservedTokenOwner4 = await nftContract.ownerOf(4);
-    expect(reservedTokenOwner4).to.equal(accounts[0].address);
-  });
-
-  it("stopAdminMinting", async function () {
-    await nftContract.stopAdminMinting();
-    expect(await nftContract.isAdminMintingDone()).to.equal(true);
-  });
-
-  it("Mint Token", async function () {
-    await nftContract.mintTokens(0, 2, {
-      value: ethers.utils.parseEther("0.2"),
-    });
-    var ownerOf0 = await nftContract.ownerOf(0);
-    expect(ownerOf0).to.equal(accounts[0].address);
-    var ownerOf1 = await nftContract.ownerOf(1);
-    expect(ownerOf1).to.equal(accounts[0].address);
-  });
-
-  it("Expected to Revert - Max wallet category tokens already minted", async function () {
-    await expect(
-      nftContract.mintTokens(0, 5, {
-        value: ethers.utils.parseEther("0.5"),
-      })
-    ).to.be.revertedWith("Over Max wallet category");
-  });
-
-  it("Create a Public Category", async function () {
-    var time = Math.floor(Date.now() / 1000);
-    await nftContract.addCategory(
-      time,
-      time + 5200,
-      5,
-      10,
-      false,
-      true,
-      ethers.utils.parseEther("0.1")
+    const tierInfo = await vestingContract.tierInfo(0);
+    expect(tierInfo.maxTokensPerWallet).to.equal(
+      ethers.utils.parseEther('100')
     );
   });
 
-  it("Can't Mint Max per Category achieved!", async function () {
-    await nftContract.connect(accounts[2]).mintTokens(1, 5, {
-      value: ethers.utils.parseEther("0.5"),
-    });
-  });
-
-  it("Create a Public Category", async function () {
-    var time = Math.floor(Date.now() / 1000);
-    await nftContract.addCategory(
-      time + 5200,
-      time + 15200,
-      5,
-      10,
-      false,
-      true,
-      ethers.utils.parseEther("0.1")
+  it('Create Tier 2', async function () {
+    await vestingContract.createPreSaleTier(
+      ethers.utils.parseEther('10'),
+      Date.now() + secondsInMonth,
+      Date.now() + secondsInMonth * 2,
+      ethers.utils.parseEther('200'),
+      ethers.utils.parseEther('10')
     );
+
+    const tierInfo = await vestingContract.tierInfo(1);
+    expect(tierInfo.maxTokensPerWallet).to.equal(ethers.utils.parseEther('10'));
   });
 
-  it("Expected to Revert - Can't Mint before minting time has started", async function () {
-    await expect(
-      nftContract.connect(accounts[2]).mintTokens(2, 5, {
-        value: ethers.utils.parseEther("0.5"),
-      })
-    ).to.be.revertedWith("Category not Active");
-  });
-
-  it("Create a Public Category - 1 Max mint per category", async function () {
-    var time = Math.floor(Date.now() / 1000);
-    await nftContract.addCategory(
-      time,
-      time + 15200,
-      5,
+  it('Update Tier 2', async function () {
+    await vestingContract.updatePreSaleTier(
       1,
-      false,
-      true,
-      ethers.utils.parseEther("0.1")
+      ethers.utils.parseEther('10'),
+      Date.now() + secondsInMonth,
+      Date.now() + secondsInMonth * 2,
+      ethers.utils.parseEther('200'),
+      ethers.utils.parseEther('8')
     );
-  });
 
-  it("Expected to Revert - Can't Mint before minting time has started", async function () {
-    await expect(
-      nftContract.connect(accounts[3]).mintTokens(3, 5, {
-        value: ethers.utils.parseEther("0.5"),
-      })
-    ).to.be.revertedWith("Over Max category tokens");
-  });
-
-  it("Token URI", async function () {
-    tokenURI = await nftContract.tokenURI(1);
-    expect(tokenURI).to.equal("www.link.com/1");
+    const tierInfo = await vestingContract.tierInfo(1);
+    expect(tierInfo.price).to.equal(ethers.utils.parseEther('8'));
   });
 });

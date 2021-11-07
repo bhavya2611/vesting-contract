@@ -89,8 +89,8 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _price
     ) external onlyOwner {
         require(
-            tierInfo[_tierId].startTime < block.timestamp,
-            "Pre sale not yet started"
+            tierInfo[_tierId].startTime > block.timestamp,
+            "Pre sale already in progress"
         );
         tierInfo[_tierId].maxTokensPerWallet = _maxTokensPerWallet;
         tierInfo[_tierId].startTime = _startTime;
