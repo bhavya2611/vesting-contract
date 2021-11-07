@@ -7,13 +7,16 @@ const { solidity } = require('ethereum-waffle');
 
 use(solidity);
 
-const secondsInMonth = 2592000;
+const secondsInMonth = 2592000000;
 
 describe('Vesting Contract', function () {
   it('Defining Generals', async function () {
     // General
     provider = ethers.provider;
     accounts = await hre.ethers.getSigners();
+
+    await ethers.provider.send('evm_setNextBlockTimestamp', [Date.now()]);
+    await ethers.provider.send('evm_mine');
   });
 
   it('Deploying Contracts', async function () {
@@ -48,7 +51,8 @@ describe('Vesting Contract', function () {
       Date.now(),
       Date.now() + secondsInMonth,
       ethers.utils.parseEther('200'),
-      ethers.utils.parseEther('5')
+      ethers.utils.parseEther('5'),
+      false
     );
 
     const tierInfo = await vestingContract.tierInfo(0);
@@ -63,7 +67,8 @@ describe('Vesting Contract', function () {
       Date.now() + secondsInMonth,
       Date.now() + secondsInMonth * 2,
       ethers.utils.parseEther('200'),
-      ethers.utils.parseEther('10')
+      ethers.utils.parseEther('10'),
+      true
     );
 
     const tierInfo = await vestingContract.tierInfo(1);
@@ -77,7 +82,8 @@ describe('Vesting Contract', function () {
       Date.now() + secondsInMonth,
       Date.now() + secondsInMonth * 2,
       ethers.utils.parseEther('200'),
-      ethers.utils.parseEther('8')
+      ethers.utils.parseEther('8'),
+      true
     );
 
     const tierInfo = await vestingContract.tierInfo(1);
@@ -127,13 +133,44 @@ describe('Vesting Contract', function () {
     expect(balance).to.equal(ethers.utils.parseEther('100'));
   });
 
+  it('Transfer Vest Tokens to Contract', async function () {
+    await vestToken.transfer(
+      vestingContract.address,
+      ethers.utils.parseEther('100')
+    );
+
+    balance = await vestToken.balanceOf(vestingContract.address);
+    expect(balance).to.equal(ethers.utils.parseEther('100'));
+  });
+
   it('Buy Vesting Tokens', async function () {
-    await vestingContract.connect(accounts[2]).buyVestingTokens(0, 10);
+    await ethers.provider.send('evm_setNextBlockTimestamp', [Date.now()]);
+    await ethers.provider.send('evm_mine');
+
+    await stableToken
+      .connect(accounts[2])
+      .approve(vestingContract.address, ethers.utils.parseEther('1000'));
+
+    await vestingContract
+      .connect(accounts[2])
+      .buyVestingTokens(0, ethers.utils.parseEther('10'));
 
     tokensBought = await vestingContract.tokensBought(accounts[2].address, 0);
-    expect(tokensBought).to.equal(10);
+    expect(tokensBought).to.equal(ethers.utils.parseEther('10'));
 
     balance = await stableToken.balanceOf(accounts[2].address);
     expect(balance).to.equal(ethers.utils.parseEther('50'));
+  });
+
+  it('Vest Tokens', async function () {
+    await ethers.provider.send('evm_setNextBlockTimestamp', [
+      Date.now() + secondsInMonth * 3,
+    ]);
+    await ethers.provider.send('evm_mine');
+
+    await vestingContract.connect(accounts[2]).vestTokens(0);
+
+    balance = await vestToken.balanceOf(accounts[2].address);
+    expect(balance).to.equal(ethers.utils.parseEther('1'));
   });
 });

@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 contract Vesting is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
@@ -26,7 +27,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _value
     );
 
-    uint256 public secondsInMonth = 2592000;
+    uint256 public msInMonth = 2592000000;
 
     constructor(address _stableCoin, address _vestToken) {
         stableCoin = _stableCoin;
@@ -39,6 +40,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 endTime;
         uint256 maxTokensForTier;
         uint256 price;
+        bool isPrivate;
     }
 
     struct TierVestingInfo {
@@ -56,6 +58,9 @@ contract Vesting is Ownable, ReentrancyGuard {
     // user address => tierId => tokensBought
     mapping(address => mapping(uint256 => uint256)) public tokensBought;
 
+    // user address => tierId => tokensBought
+    mapping(address => mapping(uint256 => bool)) public isAddressWhitelisted;
+
     // user address => tierId => month => vestedMonth
     mapping(address => mapping(uint256 => uint256))
         public userVestedTokensMonth;
@@ -67,7 +72,8 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _startTime,
         uint256 _endTime,
         uint256 _maxTokensForTier,
-        uint256 _price
+        uint256 _price,
+        bool _isPrivate
     ) external onlyOwner {
         tierInfo.push(
             PreSaleTierInfo({
@@ -75,7 +81,8 @@ contract Vesting is Ownable, ReentrancyGuard {
                 startTime: _startTime,
                 endTime: _endTime,
                 price: _price,
-                maxTokensForTier: _maxTokensForTier
+                maxTokensForTier: _maxTokensForTier,
+                isPrivate: _isPrivate
             })
         );
     }
@@ -86,7 +93,8 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _startTime,
         uint256 _endTime,
         uint256 _maxTokensForTier,
-        uint256 _price
+        uint256 _price,
+        bool _isPrivate
     ) external onlyOwner {
         require(
             tierInfo[_tierId].startTime > block.timestamp,
@@ -97,10 +105,31 @@ contract Vesting is Ownable, ReentrancyGuard {
         tierInfo[_tierId].endTime = _endTime;
         tierInfo[_tierId].maxTokensForTier = _maxTokensForTier;
         tierInfo[_tierId].price = _price;
+        tierInfo[_tierId].isPrivate = _isPrivate;
     }
 
     function tierLength() external view returns (uint256) {
         return tierInfo.length;
+    }
+
+    function whitelistAddress(address _address, uint256 _tierId)
+        public
+        onlyOwner
+    {
+        require(_tierId <= tierInfo.length, "Invalid tier id");
+        isAddressWhitelisted[_address][_tierId] = true;
+    }
+
+    function removeWhitelistAddress(address _address, uint256 _tierId)
+        public
+        onlyOwner
+    {
+        require(_tierId <= tierInfo.length, "Invalid tier id");
+        require(
+            tokensBought[msg.sender][_tierId] == 0,
+            "User already bought tokens"
+        );
+        isAddressWhitelisted[_address][_tierId] = false;
     }
 
     function setAllocation(
@@ -154,16 +183,28 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Cant buy more tokens for this tier"
         );
         require(
-            tokensBought[msg.sender][_tierId].add(_numTokens) <=
+            tokensBought[msg.sender][_tierId] + _numTokens <=
                 tierInfo[_tierId].maxTokensPerWallet,
             "You cant buy more tokens"
         );
-        uint256 totalTokenAmount = tierInfo[_tierId].price.mul(_numTokens);
+
+        if (tierInfo[_tierId].isPrivate) {
+            require(
+                isAddressWhitelisted[msg.sender][_tierId],
+                "Not allowed to buy tokens"
+            );
+        }
+
+        uint256 totalTokenAmount = tierInfo[_tierId].price.mul(_numTokens).div(
+            10e17
+        );
+
         IERC20(stableCoin).transferFrom(
             msg.sender,
             address(this),
             totalTokenAmount
         );
+
         tokensBought[msg.sender][_tierId] = tokensBought[msg.sender][_tierId]
             .add(_numTokens);
         tierVestingInfo[_tierId].totalTokensBoughtForTier = tierVestingInfo[
@@ -183,12 +224,12 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Your token balance is zero"
         );
         require(
-            tierVestingInfo[_tierId].totalAllocationDone == 0,
+            tierVestingInfo[_tierId].totalAllocationDone == 100,
             "Allocation is not 100%"
         );
 
-        uint256 monthsPassed = (block.timestamp +
-            tierVestingInfo[_tierId].vestingStartTime) % secondsInMonth;
+        uint256 monthsPassed = (block.timestamp -
+            tierVestingInfo[_tierId].vestingStartTime) / msInMonth;
 
         require(
             monthsPassed > userVestedTokensMonth[msg.sender][_tierId],
@@ -215,10 +256,10 @@ contract Vesting is Ownable, ReentrancyGuard {
 
         uint256 amount = tokensBought[msg.sender][_tierId]
             .mul(totalAllocation)
-            .div(10000);
+            .div(100);
 
         userVestedTokensMonth[msg.sender][_tierId] = monthsPassed;
-        IERC20(vestToken).transferFrom(address(this), msg.sender, amount);
+        IERC20(vestToken).transfer(msg.sender, amount);
 
         emit TokensVested(msg.sender, _tierId, amount);
     }
