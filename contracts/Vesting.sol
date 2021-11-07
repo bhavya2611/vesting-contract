@@ -14,6 +14,20 @@ contract Vesting is Ownable, ReentrancyGuard {
     address public stableCoin;
     address public vestToken;
 
+    event TokensBought(
+        address indexed _from,
+        uint256 indexed _tierId,
+        uint256 _value
+    );
+
+    event TokensVested(
+        address indexed _from,
+        uint256 indexed _tierId,
+        uint256 _value
+    );
+
+    uint256 public secondsInMonth = 2592000;
+
     constructor(address _stableCoin, address _vestToken) {
         stableCoin = _stableCoin;
         vestToken = _vestToken;
@@ -42,9 +56,9 @@ contract Vesting is Ownable, ReentrancyGuard {
     // user address => tierId => tokensBought
     mapping(address => mapping(uint256 => uint256)) public tokensBought;
 
-    // user address => tierId => month => vested
-    mapping(address => mapping(uint256 => mapping(uint256 => bool)))
-        public userVestedTokens;
+    // user address => tierId => month => vestedMonth
+    mapping(address => mapping(uint256 => uint256))
+        public userVestedTokensMonth;
 
     PreSaleTierInfo[] public tierInfo;
 
@@ -111,46 +125,55 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _allocation
     ) public onlyOwner {
         require(_month > 0, "Invalid month number");
-        require(_month < 13, "Invalid month number");
-        require(_tierId < tierInfo.length, "Invalid tier id");
+        require(_month < 37, "Invalid month number");
+        require(_tierId <= tierInfo.length, "Invalid tier id");
         require(
             tierVestingInfo[_tierId].totalAllocationDone.add(_allocation) <=
                 100,
             "Allocation cant be more than 100"
         );
-        // See If a check is required to not allow to do allocation again or change allocation after month is passed
+        require(
+            tierVestingInfo[_tierId].startVestingForTier < block.timestamp,
+            "Vesting started"
+        );
         tierVestingInfo[_tierId].totalAllocationDone = tierVestingInfo[_tierId]
             .totalAllocationDone
             .add(_allocation);
         allocationPerMonth[_tierId][_month] = _allocation;
     }
 
-    function buyTokens(uint256 _tierId, uint256 _numTokens) public payable {
+    function buyTokens(uint256 _tierId, uint256 _numTokens) public {
         require(
             tierInfo[_tierId].startTime < block.timestamp,
             "Pre sale not yet started"
         );
         require(tierInfo[_tierId].endTime > block.timestamp, "Pre sale over");
         require(
-            tierVestingInfo[_tierId].totalTokensBoughtForTier + _numTokens <
+            tierVestingInfo[_tierId].totalTokensBoughtForTier.add(_numTokens) <=
                 tierInfo[_tierId].maxTokensForTier,
             "Cant buy more tokens for this tier"
         );
         require(
-            tokensBought[msg.sender][_tierId] + _numTokens <
+            tokensBought[msg.sender][_tierId].add(_numTokens) <=
                 tierInfo[_tierId].maxTokensPerWallet,
             "You cant buy more tokens"
         );
-        uint256 tokenPrice = tierInfo[_tierId].price.mul(_numTokens);
-        IERC20(stableCoin).transferFrom(msg.sender, address(this), tokenPrice);
+        uint256 totalTokenAmount = tierInfo[_tierId].price.mul(_numTokens);
+        IERC20(stableCoin).transferFrom(
+            msg.sender,
+            address(this),
+            totalTokenAmount
+        );
         tokensBought[msg.sender][_tierId] = tokensBought[msg.sender][_tierId]
             .add(_numTokens);
         tierVestingInfo[_tierId].totalTokensBoughtForTier = tierVestingInfo[
             _tierId
         ].totalTokensBoughtForTier.add(_numTokens);
+
+        emit TokensBought(msg.sender, _tierId, _numTokens);
     }
 
-    function vestTokens(uint256 _tierId, uint256 _month) public payable {
+    function vestTokens(uint256 _tierId) public {
         require(
             tierVestingInfo[_tierId].startVestingForTier < block.timestamp,
             "Vesting for tier not yet started"
@@ -160,16 +183,43 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Your token balance is zero"
         );
         require(
-            !userVestedTokens[msg.sender][_tierId][_month],
+            tierVestingInfo[_tierId].totalAllocationDone == 0,
+            "Allocation is not 100%"
+        );
+
+        uint256 monthsPassed = (block.timestamp +
+            tierVestingInfo[_tierId].startVestingForTier) % secondsInMonth;
+
+        require(
+            monthsPassed > userVestedTokensMonth[msg.sender][_tierId],
             "You already vested tokens"
         );
 
-        // add a require to calculate month and check _month less than the months passed
+        uint256 i = 0;
+        uint256 totalAllocation = 0;
+        uint256 loopUpperLimit = 0;
+
+        if (monthsPassed < 37) {
+            loopUpperLimit = monthsPassed;
+        } else {
+            loopUpperLimit = 36;
+        }
+
+        for (
+            i = userVestedTokensMonth[msg.sender][_tierId] + 1;
+            i <= loopUpperLimit;
+            i++
+        ) {
+            totalAllocation = totalAllocation + allocationPerMonth[_tierId][i];
+        }
 
         uint256 amount = tokensBought[msg.sender][_tierId]
-            .mul(allocationPerMonth[_tierId][_month])
+            .mul(totalAllocation)
             .div(10000);
-        userVestedTokens[msg.sender][_tierId][_month] = true;
+
+        userVestedTokensMonth[msg.sender][_tierId] = monthsPassed;
         IERC20(vestToken).transferFrom(address(this), msg.sender, amount);
+
+        emit TokensVested(msg.sender, _tierId, amount);
     }
 }
