@@ -33,32 +33,14 @@ To get the Etherscan and Polygonscan API key, go to
 <br>
 <a href="https://polygonscan.com/myapikey">https://polygonscan.com/myapikey</a>
 
-# DEPLOY ON TESTNET
+# DEPLOYMENT & VERIFICATION ON MATIC TESTNET
 
 ```shell
 npx hardhat run --network rinkeby scripts/deploy.js
 ```
 
-# DEPLOY ON MATIC
+# DEPLOYMENT & VERIFICATION ON MATIC MAINET
 
 ```shell
 npx hardhat run --network matic scripts/deploy.js
-```
-
-# VERIFICATION
-
-```shell
-hardhat run --network ropsten scripts/deploy.js
-```
-
-Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_ADDRESS` in this command:
-
-```shell
-npx hardhat verify --network rinkeby DEPLOYED_CONTRACT_ADDRESS "Name", "Symbol", "10", "www.link.com/"
-```
-
-When verifying the contract on Matic, change hardhat.config.js "ETHERSCAN_API_KEY" to "ETHERSCAN_API_KEY_MATIC"
-
-```shell
-npx hardhat verify --network matic DEPLOYED_CONTRACT_ADDRESS "Name", "Symbol", "10", "www.link.com/"
 ```

@@ -26,6 +26,40 @@ contract Vesting is Ownable, ReentrancyGuard {
         uint256 _value
     );
 
+    event TierCreated(
+        uint256 _tierId,
+        uint256 _maxTokensPerWallet,
+        uint256 _startTime,
+        uint256 _endTime,
+        uint256 _maxTokensForTier,
+        uint256 _price,
+        bool _isPrivate
+    );
+
+    event TierUpdated(
+        uint256 _tierId,
+        uint256 _maxTokensPerWallet,
+        uint256 _startTime,
+        uint256 _endTime,
+        uint256 _maxTokensForTier,
+        uint256 _price,
+        bool _isPrivate
+    );
+
+    event AddressWhitelistedStatus(
+        address indexed _address,
+        uint256 _tier,
+        bool _isWhitelisted
+    );
+
+    event AddDistributionMonthAndPercent(
+        uint256 _tierId,
+        uint256 _month,
+        uint256 _percent
+    );
+
+    event VestingTimeForTier(uint256 _tierId, uint256 _startTime);
+
     uint256 public msInMonth = 2592000000;
 
     constructor(address _stableCoin, address _vestToken) {
@@ -66,6 +100,16 @@ contract Vesting is Ownable, ReentrancyGuard {
 
     PreSaleTierInfo[] public tierInfo;
 
+    /*
+     * Params
+     * uint256 - How many tokens in total a wallet can buy?
+     * uint256 - When does the sale for this tier start?
+     * uint256 - When does the sale for this tier end?
+     * uint256 - What is the total amount of tokens sold in this Tier?
+     * uint256 - What is the price per one token?
+     * bool - Do wallets need to be whitelisted?
+     */
+
     function createPreSaleTier(
         uint256 _maxTokensPerWallet,
         uint256 _startTime,
@@ -83,6 +127,15 @@ contract Vesting is Ownable, ReentrancyGuard {
                 maxTokensForTier: _maxTokensForTier,
                 isPrivate: _isPrivate
             })
+        );
+        emit TierCreated(
+            tierInfo.length.sub(1),
+            _maxTokensPerWallet,
+            _startTime,
+            _endTime,
+            _maxTokensForTier,
+            _price,
+            _isPrivate
         );
     }
 
@@ -105,6 +158,15 @@ contract Vesting is Ownable, ReentrancyGuard {
         tierInfo[_tierId].maxTokensForTier = _maxTokensForTier;
         tierInfo[_tierId].price = _price;
         tierInfo[_tierId].isPrivate = _isPrivate;
+        emit TierUpdated(
+            _tierId,
+            _maxTokensPerWallet,
+            _startTime,
+            _endTime,
+            _maxTokensForTier,
+            _price,
+            _isPrivate
+        );
     }
 
     function tierLength() external view returns (uint256) {
@@ -118,6 +180,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         require(_tierId <= tierInfo.length, "Invalid tier id");
         require(tierInfo[_tierId].isPrivate, "Tier needs to be private");
         isAddressWhitelisted[_address][_tierId] = true;
+        emit AddressWhitelistedStatus(_address, _tierId, true);
     }
 
     function removeWhitelistAddress(address _address, uint256 _tierId)
@@ -130,20 +193,20 @@ contract Vesting is Ownable, ReentrancyGuard {
             "User already bought tokens"
         );
         isAddressWhitelisted[_address][_tierId] = false;
+        emit AddressWhitelistedStatus(_address, _tierId, false);
     }
 
-    function setAllocation(
+    function setDistributionPercent(
         uint256 _tierId,
         uint256 _month,
-        uint256 _allocation
+        uint256 _percent
     ) public onlyOwner {
         require(_month > 0, "Invalid month number");
         require(_month < 37, "Invalid month number");
         require(_tierId <= tierInfo.length, "Invalid tier id");
         require(
-            tierVestingInfo[_tierId].totalAllocationDone.add(_allocation) <=
-                100,
-            "Allocation cant be more than 100"
+            tierVestingInfo[_tierId].totalAllocationDone.add(_percent) <= 10000,
+            "Allocation cant be more than 10000"
         );
         require(
             tierVestingInfo[_tierId].vestingStartTime < block.timestamp,
@@ -151,8 +214,9 @@ contract Vesting is Ownable, ReentrancyGuard {
         );
         tierVestingInfo[_tierId].totalAllocationDone = tierVestingInfo[_tierId]
             .totalAllocationDone
-            .add(_allocation);
-        allocationPerMonth[_tierId][_month] = _allocation;
+            .add(_percent);
+        allocationPerMonth[_tierId][_month] = _percent;
+        emit AddDistributionMonthAndPercent(_tierId, _month, _percent);
     }
 
     function setVestingTimeForTier(uint256 _tierId, uint256 _startTime)
@@ -165,13 +229,15 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Tier not yet started"
         );
         require(
-            tierVestingInfo[_tierId].totalAllocationDone == 100,
-            "Total allocation less than 100"
+            tierVestingInfo[_tierId].totalAllocationDone == 10000,
+            "Total allocation less than 10000"
         );
         tierVestingInfo[_tierId].vestingStartTime = _startTime;
+        emit VestingTimeForTier(_tierId, _startTime);
     }
 
     function buyVestingTokens(uint256 _tierId, uint256 _numTokens) public {
+        require(tx.origin == msg.sender, "Wallets only!");
         require(
             tierInfo[_tierId].startTime < block.timestamp,
             "Pre sale not yet started"
@@ -224,8 +290,8 @@ contract Vesting is Ownable, ReentrancyGuard {
             "Your token balance is zero"
         );
         require(
-            tierVestingInfo[_tierId].totalAllocationDone == 100,
-            "Allocation is not 100%"
+            tierVestingInfo[_tierId].totalAllocationDone == 10000,
+            "Allocation is not 10000%"
         );
 
         uint256 monthsPassed = (block.timestamp -
@@ -256,7 +322,7 @@ contract Vesting is Ownable, ReentrancyGuard {
 
         uint256 amount = tokensBought[msg.sender][_tierId]
             .mul(totalAllocation)
-            .div(100);
+            .div(10000);
 
         userVestedTokensMonth[msg.sender][_tierId] = monthsPassed;
         IERC20(vestToken).transfer(msg.sender, amount);
