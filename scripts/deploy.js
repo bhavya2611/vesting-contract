@@ -15,17 +15,11 @@ async function main() {
   // manually to make sure everything is compiled
   // await hre.run('compile');
 
-  let STABLE_TOKEN_ADDRESS;
   let NAME = 'Vest';
   let SYMBOL = 'VEST';
   let SUPPLY = ethers.utils.parseEther('10000000000000');
 
-  if (hre.network.name === 'maticTestnet')
-    STABLE_TOKEN_ADDRESS = '0xe07d7b44d340216723ed5ea33c724908b817ee9d';
-  else if (hre.network.name === 'matic')
-    STABLE_TOKEN_ADDRESS = '0xe07d7b44d340216723ed5ea33c724908b817ee9d';
-
-  //^^^^^^^^^^^^^^^^^^^^^^^^^^ DEPLOYMENT ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  //^^^^^^^^^^^^^^^^^^^^^^^^^^ DEPLOYMENT VEST TOKEN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
   /**
    * Params
@@ -52,8 +46,14 @@ async function main() {
     constructorArguments: [NAME, SYMBOL, SUPPLY],
   });
 
-  //^^^^^^^^^^^^^^^^^^^^^^^^^^ DEPLOYMENT ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DEPLOYMENT VESTING CONTRACT ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+  let STABLE_TOKEN_ADDRESS;
+
+  if (hre.network.name === 'maticTestnet')
+    STABLE_TOKEN_ADDRESS = '0xe07d7b44d340216723ed5ea33c724908b817ee9d';
+  else if (hre.network.name === 'matic')
+    STABLE_TOKEN_ADDRESS = '0xe07d7b44d340216723ed5ea33c724908b817ee9d';
   /**
    * Params
    * Address - Stable Token
