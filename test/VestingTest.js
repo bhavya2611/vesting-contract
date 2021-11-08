@@ -7,7 +7,7 @@ const { solidity } = require("ethereum-waffle");
 
 use(solidity);
 
-const secondsInMonth = 2592000000;
+const milSecondsInMonth = 2592000000;
 
 describe("Vesting Contract", function () {
   it("Defining Generals", async function () {
@@ -49,7 +49,7 @@ describe("Vesting Contract", function () {
     await vestingContract.createPreSaleTier(
       ethers.utils.parseEther("100"),
       Date.now(),
-      Date.now() + secondsInMonth * 4,
+      Date.now() + milSecondsInMonth * 4,
       ethers.utils.parseEther("200"),
       ethers.utils.parseEther("5"),
       false
@@ -64,8 +64,8 @@ describe("Vesting Contract", function () {
   it("Create Tier 2", async function () {
     await vestingContract.createPreSaleTier(
       ethers.utils.parseEther("10"),
-      Date.now() + secondsInMonth,
-      Date.now() + secondsInMonth * 8,
+      Date.now() + milSecondsInMonth,
+      Date.now() + milSecondsInMonth * 8,
       ethers.utils.parseEther("200"),
       ethers.utils.parseEther("10"),
       true
@@ -79,8 +79,8 @@ describe("Vesting Contract", function () {
     await vestingContract.updatePreSaleTier(
       1,
       ethers.utils.parseEther("10"),
-      Date.now() + secondsInMonth,
-      Date.now() + secondsInMonth * 8,
+      Date.now() + milSecondsInMonth,
+      Date.now() + milSecondsInMonth * 8,
       ethers.utils.parseEther("200"),
       ethers.utils.parseEther("8"),
       true
@@ -119,7 +119,7 @@ describe("Vesting Contract", function () {
   });
 
   it("Set Vesting Time For Tier 1", async function () {
-    const time = Date.now() + secondsInMonth;
+    const time = Date.now() + milSecondsInMonth;
     await vestingContract.setVestingTimeForTier(0, time);
 
     tierVestingInfo = await vestingContract.tierVestingInfo(0);
@@ -127,7 +127,7 @@ describe("Vesting Contract", function () {
   });
 
   it("Set Vesting Time For Tier 2 Should Fail", async function () {
-    const time = Date.now() + secondsInMonth;
+    const time = Date.now() + milSecondsInMonth;
     await expect(
       vestingContract.setVestingTimeForTier(1, time)
     ).to.be.revertedWith("Total allocation less than 10000");
@@ -152,7 +152,7 @@ describe("Vesting Contract", function () {
   });
 
   it("Set Vesting Time For Tier 2", async function () {
-    const time = Date.now() + secondsInMonth;
+    const time = Date.now() + milSecondsInMonth;
     await vestingContract.setVestingTimeForTier(1, time);
 
     tierVestingInfo = await vestingContract.tierVestingInfo(1);
@@ -191,7 +191,7 @@ describe("Vesting Contract", function () {
 
   it("Buy Vesting Tokens For Tier 2 From account 2 should fail", async function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [
-      Date.now() + secondsInMonth,
+      Date.now() + milSecondsInMonth,
     ]);
     await ethers.provider.send("evm_mine");
 
@@ -208,7 +208,7 @@ describe("Vesting Contract", function () {
 
   it("Buy Vesting Tokens", async function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [
-      Date.now() + secondsInMonth,
+      Date.now() + milSecondsInMonth,
     ]);
     await ethers.provider.send("evm_mine");
 
@@ -229,7 +229,7 @@ describe("Vesting Contract", function () {
 
   it("Vest Tokens After 3 months", async function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [
-      Date.now() + secondsInMonth * 3,
+      Date.now() + milSecondsInMonth * 3,
     ]);
     await ethers.provider.send("evm_mine");
 
@@ -241,7 +241,7 @@ describe("Vesting Contract", function () {
 
   it("Vest Tokens After 8 months", async function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [
-      Date.now() + secondsInMonth * 8,
+      Date.now() + milSecondsInMonth * 8,
     ]);
     await ethers.provider.send("evm_mine");
 
@@ -253,7 +253,7 @@ describe("Vesting Contract", function () {
 
   it("Vest Tokens After 16 months", async function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [
-      Date.now() + secondsInMonth * 16,
+      Date.now() + milSecondsInMonth * 16,
     ]);
     await ethers.provider.send("evm_mine");
 
