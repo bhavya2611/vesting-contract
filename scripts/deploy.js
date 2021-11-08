@@ -42,6 +42,18 @@ async function main() {
 
   console.log('Vesting Token deployed to:', vestToken.address);
 
+  // vvvvvvvvvvvvvvvvvvvvvvvvv VERIFICATION vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+  console.log('Wait for contract!');
+  await delay(46000);
+  console.log('Waited 46s');
+
+  await hre.run('verify:verify', {
+    address: vestToken.address,
+    constructorArguments: [NAME, SYMBOL, SUPPLY],
+  });
+
+  //^^^^^^^^^^^^^^^^^^^^^^^^^^ DEPLOYMENT ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
   /**
    * Params
    * Address - Stable Token
