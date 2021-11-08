@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "hardhat/console.sol";
 
 contract Vesting is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
