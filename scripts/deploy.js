@@ -3,7 +3,7 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-const hre = require("hardhat");
+const hre = require('hardhat');
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -14,28 +14,27 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const NFTContract = await ethers.getContractFactory("NftCategory");
+  const VestingContract = await ethers.getContractFactory('Vesting');
 
   /**
    * Params
-   * String - NFT NAME
-   * String - NFT SYMBOL
-   * Uint256 - Max NFT's that can be minted.
-   * String - NFT URI.
+   * Address - Stable Token
+   * Address - Vest Token
    */
-  nftContract = await NFTContract.deploy(
-    "Name",
-    "Symbol",
-    "10",
-    "www.link.com/"
-  );
-  await nftContract.deployed();
 
-  console.log("NFT deployed to:", nftContract.address);
+  vestingContract = await VestingContract.deploy(
+    'Address-StableToken',
+    'Address-VestToken'
+  );
+
+  await vestingContract.deployed();
+
+  console.log('Vesting Contract deployed to:', vestingContract.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
+
 main()
   .then(() => process.exit(0))
   .catch((error) => {
