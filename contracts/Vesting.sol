@@ -60,7 +60,7 @@ contract Vesting is Ownable, ReentrancyGuard {
 
     event VestingTimeForTier(uint256 _tierId, uint256 _startTime);
 
-    uint256 public msInMonth = 2592000000;
+    uint256 public sInMonth = 30 days;
 
     constructor(address _stableCoin, address _vestToken) {
         stableCoin = _stableCoin;
@@ -225,10 +225,6 @@ contract Vesting is Ownable, ReentrancyGuard {
     {
         require(_tierId < tierInfo.length, "Invalid tier id");
         require(
-            tierInfo[_tierId].startTime < _startTime,
-            "Tier not yet started"
-        );
-        require(
             tierVestingInfo[_tierId].totalAllocationDone == 10000,
             "Total allocation less than 10000"
         );
@@ -260,10 +256,14 @@ contract Vesting is Ownable, ReentrancyGuard {
                 "Not allowed to buy tokens"
             );
         }
-
-        uint256 totalTokenAmount = tierInfo[_tierId].price.mul(_numTokens).div(
-            10e17
-        );
+        uint256 totalTokenAmount;
+        if (tierInfo[_tierId].price > 0) {
+            totalTokenAmount = tierInfo[_tierId].price.mul(_numTokens).div(
+                10e17
+            );
+        } else {
+            totalTokenAmount = _numTokens;
+        }
 
         IERC20(stableCoin).transferFrom(
             msg.sender,
@@ -295,7 +295,7 @@ contract Vesting is Ownable, ReentrancyGuard {
         );
 
         uint256 monthsPassed = (block.timestamp -
-            tierVestingInfo[_tierId].vestingStartTime) / msInMonth;
+            tierVestingInfo[_tierId].vestingStartTime) / sInMonth;
 
         require(
             monthsPassed > userVestedTokensMonth[msg.sender][_tierId],
@@ -328,5 +328,9 @@ contract Vesting is Ownable, ReentrancyGuard {
         IERC20(vestToken).transfer(msg.sender, amount);
 
         emit TokensVested(msg.sender, _tierId, amount);
+    }
+
+    function adminWithdrawStableCoin(uint256 _amount) public onlyOwner {
+        IERC20(stableCoin).transfer(msg.sender, _amount);
     }
 }
